@@ -4,7 +4,6 @@ import random
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
-MOVEMENT_SPEED = 3
 SPRITE_SCALING = 0.4
 TEXTURE_LEFT = 0
 TEXTURE_RIGHT = 1
@@ -29,15 +28,12 @@ RIGHT_VIEWPORT_MARGIN = 250
 BOTTOM_VIEWPORT_MARGIN = 100
 TOP_VIEWPORT_MARGIN = 100
 
-SPRITE_SPEED = 0.5
-
-
 class Ghost(arcade.Sprite):
 
     direction = 'UP'
     repeat_direction = ''
 
-    def follow_sprite(self, player_sprite, walls_sprite, pathToMove):
+    def follow_sprite(self, player_sprite, walls_sprite, pathToMove, SPRITE_SPEED):
         """
         This function will move the current sprite towards whatever
         other sprite is specified as a parameter.
@@ -131,7 +127,7 @@ class Player(arcade.Sprite):
 
         # By default, face right.
         self.set_texture(TEXTURE_RIGHT)
-        
+     
 
     def update(self):
         self.center_x += self.change_x
@@ -163,12 +159,18 @@ class MyGame(arcade.Window):
     def __init__(self, width, height, SCREEN_TITLE):
         super().__init__(width, height, SCREEN_TITLE, resizable=True)
 
+        self.MOVEMENT_SPEED = 0.5
+        self.SPRITE_SPEED = 0.5
+
         # Track the current state of what key is pressed
         self.left_pressed = False
         self.right_pressed = False
         self.up_pressed = False
         self.down_pressed = False
         self.totalCoins = 0
+        self.score = 0
+        self.isGameOver = False
+        self.level = 1
 
         # Our physics engine
         self.physics_engine = None
@@ -180,7 +182,6 @@ class MyGame(arcade.Window):
         self.player_list = None
         self.ghost_list = None
         self.barrier_list = None
-
 
         # Separate variable that holds the player sprite
         self.player_sprite = None
@@ -216,12 +217,12 @@ class MyGame(arcade.Window):
         self.ghost_list.append(ghost)
         ghost = Ghost("images/ghost.png", CHARACTER_SCALING)
         ghost.center_x = 780
-        ghost.center_y = 280    # 40 increase
+        ghost.center_y = 320    # 40 increase
         self.ghost_list.append(ghost)
 
         # Set up the player
         self.player_sprite = Player()
-        self.player_sprite.center_x = 420
+        self.player_sprite.center_x = 380
         self.player_sprite.center_y = 240
         self.player_list.append(self.player_sprite)
 
@@ -280,6 +281,18 @@ class MyGame(arcade.Window):
         self.physics_engine = arcade.PhysicsEnginePlatformer(self.player_sprite,
                                                              self.wall_list,
                                                              0.0)
+                                                       
+
+    def draw_game_over(self):
+        """
+        Draw "Game over" across the screen.
+        """
+        output = "Game Over"
+        arcade.draw_text(output, 240, 450, arcade.color.WHITE, 54)
+
+        output = "Press Space to restart"
+        arcade.draw_text(output, 280, 330, arcade.color.WHITE, 24)
+
 
     def on_draw(self):
         """ Render the screen. """
@@ -291,60 +304,78 @@ class MyGame(arcade.Window):
         self.player_list.draw()
         self.ghost_list.draw()
 
-        for ghost in self.ghost_list:
-            if(ghost.path):
-                arcade.draw_line_strip(ghost.path, arcade.color.BLUE, 2)
+        # for ghost in self.ghost_list:
+        #     if(ghost.path):
+        #         arcade.draw_line_strip(ghost.path, arcade.color.BLUE, 2)
+        
+        output = f"Score: {self.score}"
+        arcade.draw_text(output, 5, 780, arcade.color.WHITE, 14)
+        output = f"Level: {self.level}"
+        arcade.draw_text(output, 730, 780, arcade.color.WHITE, 14)
+        output = "Q to exit"
+        arcade.draw_text(output, 700, 10, arcade.color.WHITE, 14)
+
+        if(self.isGameOver == True):
+            self.draw_game_over()
 
     def on_update(self, delta_time):
         """ Movement and game logic """
-        # Move the player with the physics engine
-        self.physics_engine.update()
 
-        
+        if(self.isGameOver == False):
+            # Move the player with the physics engine
+            self.physics_engine.update()      
 
-        # See if we hit any coins
-        coin_hit_list = arcade.check_for_collision_with_list(self.player_sprite,
-                                                             self.coin_list)
+            # See if we hit any coins
+            coin_hit_list = arcade.check_for_collision_with_list(self.player_sprite,
+                                                                self.coin_list)
 
-        # Loop through each coin we hit (if any) and remove it
-        for coin in coin_hit_list:
-            # Remove the coin
-            coin.remove_from_sprite_lists()
-            self.totalCoins = self.totalCoins - 1
+            # Loop through each coin we hit (if any) and remove it
+            for coin in coin_hit_list:
+                # Remove the coin
+                coin.remove_from_sprite_lists()
+                self.score = self.score + 1
+                self.totalCoins = self.totalCoins - 1
 
-        # Calculate speed based on the keys pressed
-        self.player_sprite.change_x = 0
-        self.player_sprite.change_y = 0
+            if(self.totalCoins<=0):
+                # new level
+                self.level = self.level + 1
+                self.MOVEMENT_SPEED = self.MOVEMENT_SPEED + 0.15
+                self.SPRITE_SPEED = self.SPRITE_SPEED + 0.15
+                self.setup()
 
-        if self.up_pressed and not self.down_pressed:
-            self.player_sprite.change_y = MOVEMENT_SPEED
-        elif self.down_pressed and not self.up_pressed:
-            self.player_sprite.change_y = -MOVEMENT_SPEED
-        if self.left_pressed and not self.right_pressed:
-            self.player_sprite.change_x = -MOVEMENT_SPEED
-        elif self.right_pressed and not self.left_pressed:
-            self.player_sprite.change_x = MOVEMENT_SPEED
+            # Calculate speed based on the keys pressed
+            self.player_sprite.change_x = 0
+            self.player_sprite.change_y = 0
 
-        # Call update to move the sprite
-        # If using a physics engine, call update on it instead of the sprite
-        # list.
-        self.player_list.update()
+            if self.up_pressed and not self.down_pressed:
+                self.player_sprite.change_y = self.MOVEMENT_SPEED
+            elif self.down_pressed and not self.up_pressed:
+                self.player_sprite.change_y = -self.MOVEMENT_SPEED
+            if self.left_pressed and not self.right_pressed:
+                self.player_sprite.change_x = -self.MOVEMENT_SPEED
+            elif self.right_pressed and not self.left_pressed:
+                self.player_sprite.change_x = self.MOVEMENT_SPEED
 
-        # Set to True if we can move diagonally. Note that diagnonal movement
-        # might cause the enemy to clip corners.
-    
-        # self.path = arcade.astar_calculate_path(ghost.position,
-                                                # self.player_sprite.position,
-                                                # self.barrier_list,
-                                                # diagonal_movement=False)
+            # Call update to move the sprite
+            # If using a physics engine, call update on it instead of the sprite
+            # list.
+            self.player_list.update()
 
-        for ghost in self.ghost_list:
-            ghost.path = arcade.astar_calculate_path(ghost.position,
-                                        self.player_sprite.position,
-                                        self.barrier_list,
-                                        diagonal_movement=False)
+            # Set to True if we can move diagonally. Note that diagnonal movement
+            # might cause the enemy to clip corners.
+            for ghost in self.ghost_list:
+                ghost.path = arcade.astar_calculate_path(ghost.position,
+                                            self.player_sprite.position,
+                                            self.barrier_list,
+                                            diagonal_movement=False)
 
-            ghost.follow_sprite(self.player_sprite, self.wall_list, ghost.path)
+                ghost.follow_sprite(self.player_sprite, self.wall_list, ghost.path, self.SPRITE_SPEED)
+
+            # See if we hit any coins
+            ghostPacman = arcade.check_for_collision_with_list(self.player_sprite,self.ghost_list)
+
+            if(ghostPacman):
+                self.isGameOver = True
         
 
     def on_key_press(self, key, modifiers):
@@ -371,6 +402,14 @@ class MyGame(arcade.Window):
         elif key == arcade.key.RIGHT:
             self.right_pressed = False
 
+        if(key == arcade.key.SPACE) and (self.isGameOver==True):
+            self.setup()
+            self.score = 0
+            self.level = 1
+            self.isGameOver = False
+
+        if(key == arcade.key.Q):
+            arcade.close_window()
 
 def main():
     game = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
